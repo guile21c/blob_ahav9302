@@ -1,0 +1,367 @@
+(emacs users can use -*- outline -*- mode for this file)
+
+$Id: README,v 1.9 2000/03/25 13:42:52 erikm Exp $
+
+* Info
+======
+
+** What is blob?
+----------------
+
+Blob is the Boot Loader OBject, the boot loader for the LART. Blob is
+able to boot a Linux kernel stored in flash or RAM and provide that
+kernel with a ramdisk (again from flash or RAM).
+
+Blob is copyrighted by Jan-Derk Bakker (J.D.Bakker@its.tudelft.nl) and
+Erik Mouw (J.A.K.Mouw@its.tudelft.nl). Blob is released with a slightly
+modified GNU GPL license: we don't consider the operating systems that
+blob boots as a derived work.
+
+
+
+
+** So what is LART?
+-------------------
+
+LART is the Linux Advanced Radio Terminal, a small low power computing
+element used in the MMC project (http://mmc.et.tudelft.nl/ and
+http://www.lart.tudelft.nl/).
+
+LART features:
+
+- 10x7.5 cm (that's 4x3 inch in Stonehenge Units)
+- 220 MHz Digital StrongARM SA-1100 CPU
+- 4 Mbyte flash memory
+- 32 Mbyte DRAM memory
+- Low power: peak power consumption is 1W
+
+
+
+
+* Building blob
+===============
+
+** Prerequisites
+----------------
+
+- A native ARM/StrongARM Linux system with gcc 2.95.2, and
+  binutils 2.9.5.0.22 or better
+- Or any UNIX system with cross compiling binutils 2.9.5.0.22 (or
+  better) and gcc 2.95.2 installed
+- GNU make (although some vendor supplied make utilities will do)
+- GNU autoconf and automake (if you build blob from CVS)
+
+We tested blob with a native system (Corel/Rebel Netwinder) and with
+several i386-linux to arm-linux cross compiler systems, but the GNU
+tools are that good that we don't think that a Solaris-2.6 to
+arm-linux cross compiler will fail.
+
+
+
+
+** Generating configure and Makefiles
+-------------------------------------
+
+This step is only necessary if you build blob from CVS.
+
+- Run "tools/rebuild-gcc" ttwwiiccee
+
+
+
+
+** Configuring and compiling the package
+----------------------------------------
+
+With a cross compiler tool chain (using tcsh as shell):
+
+- setenv CC /path/to/cross/gcc
+- setenv OBJCOPY /path/to/cross/objcopy
+- Run "./configure --with-linux-prefix=/path/to/armlinux/source \
+       arm-lart-linux-gnu"
+- Run "make"
+
+If you use the bash shell, use "export FOO=bar" instead of
+"setenv FOO bar".
+
+With a native ARM Linux tool chain:
+
+- Run "./configure" 
+- Run "make"
+
+
+The binary image is in src/blob, src/blob-elf32 is the image with
+complete ELF headers. To disassemble "blob-elf32", use:
+
+  objdump --disassemble-all blob-elf32
+
+To see the actual hex codes of blob, use:
+
+  od -t x4 blob
+
+
+
+
+** Installing
+-------------
+
+Use whatever tool you need to download the blob image (src/blob) at
+address 0x00000000 of your SA-1100 target. The LART project currently
+uses the following wisdom to install blob:
+
+Required hardware & software:
+- The LART itself with 4 Mbyte flash memory
+- An external 128 kbyte flash board
+- A PCI 7200 (???) digital I/O card with a Linux driver
+- A flash burn program for this I/O card
+
+The external flash board is connected to the PCI 7200 card and blob is
+written into the flash memory using the flash burn program. The
+external flash board is connected to the LART low speed interface. The
+external flash chip is mapped at address 0x00000000, and the internal
+flash is remapped at 0x08000000. As soon as the LART boots, the
+external flash is copied to the first 128 kbyte of the internal
+flash. The next time the LART is started without external flash board,
+it starts from its internal flash which now contains the just
+downloaded blob.
+
+Why this strange way to download blob? We first tried to use the
+SA-1100 JTAG interface to program the flash directly, but soon found
+out that it would take weeks to write a decent JTAG tool because JTAG
+is a real brain-damaged protocol (it was designed by a committee). To
+meet a deadline, we decided to make a special board with 128 kbyte
+external flash memory (and an LCD interface).
+
+
+
+
+** Making a distribution
+------------------------
+
+This is only needed when you want to make a tar file from the current
+blob sources.
+
+- First configure the package
+- Run "make dist"
+
+
+
+
+* Using blob on the LART
+========================
+
+** Booting
+----------
+
+First connect a terminal (or a terminal emulator like miniterm or
+Seyon) to the LART's serial port. Use the following settings for your
+terminal: 9600 baud, 8 data bits, no parity, 1 stop bit, no start bits
+(9600 8N1, a pretty standard setting for Unix systems). If possible,
+use VT100 terminal emulation. Switch on the power to the LART. The
+LART should respond with:
+
+  Consider yourself LARTed!
+  Running from internal Flash.
+  Starting the memory tester...
+  Zeroing memory...0xD0000000
+  Zeroing done. Testing for aliases...
+  Loading kernel from flash ....... done
+  Loading ramdisk from flash ............... done
+
+  blob version 1.0.0, Copyright (C) 1999 Jan-Derk Bakker and Erik Mouw.
+  blob comes with ABSOLUTELY NO WARRANTY; read the GNU GPL for details.
+  This is free software, and you are welcome to redistribute it
+  under certain conditions; read the GNU GPL for details.
+
+  Autoboot in progress, press <enter> to stop ...
+
+If you don't press the <enter> key within 10 seconds, blob will
+automatically start the Linux kernel:
+
+  Starting kernel ...
+
+  Uncompressing Linux...done.
+  Now booting the kernel
+  ...
+
+However, if you press the <enter> key, you will get the blob
+prompt:
+
+  Autoboot aborted
+  Type "help" to get a list of commands
+  blob> 
+
+
+
+
+** Commands
+-----------
+
+Blob knows several commands, typing "help" (without the ") will show
+you which:
+
+  Help for blob 1.0.6, the LART bootloader
+  The following commands are supported:
+  * boot [kernel options]      Boot Linux with optional kernel options
+  * clock PPCR MDCNFG MDCAS0 MDCAS1 MDCAS2
+                               Set the SA1100 core clock and DRAM timings
+                               (WARNING: dangerous command!)
+  * download {kernel|ramdisk}  Download kernel or ramdisk image to RAM
+  * flash {kernel|ramdisk}     Copy kernel or ramdisk from RAM to flash
+  * help                       Get this help
+  * reload {kernel|ramdisk}    Reload kernel or ramdisk from flash to RAM
+  * reset                      Reset terminal
+  * speed                      Set download speed
+  * status                     Display current status
+
+
+
+
+*** "boot"
+--------------------
+
+Boot the Linux kernel. You can supply extra parameters to the Linux
+kernel, but the current version of blob will not pass them to the
+kernel (this will change as soon as I find out how -- Erik). Blob will
+respond with:
+
+  blob> boot
+
+  Starting kernel ...
+
+  Uncompressing Linux...done.
+  Now booting the kernel
+  ...
+
+
+
+
+*** "clock"
+-----------
+
+This an experimental command to set the SA1100 core clock and DRAM
+timings. We've used it to test clock scaling. This command writes the
+exact values supplied on the command line to the PPCR, MDCNFG, MDCAS0,
+MDCAS1, and MDCAS2 registers, but it doesn't check the validity of the
+values. Example (that will crash your system for sure):
+
+  blob> clock 0x11111111 0x22222222 0x33333333 0x44444444 0x55555555
+
+WARNING: This command is DANGEROUS and HIGHLY EXPERIMENTAL. Don't use
+it unless you have a VERY thorough understanding on the inner workings
+of the SA1100 CPU! It works for us, YMMV. If it breaks your CPU, don't
+say that we didn't warn you!
+
+
+
+
+*** "download"
+--------------
+
+Download a uuencoded kernel or ramdisk to the LART RAM. This command
+needs an extra parameter: "kernel" or "ramdisk". Blob will respond
+with:
+
+  blob> download kernel
+  Switching to 115200 baud
+  You have 60 seconds to switch your terminal emulator to the same speed and
+  start downloading. After that blob will switch back to 9600 baud.
+
+Switch your terminal emulator to the indicated speed and start
+downloading the kernel or ramdisk. With minicom, you can use the ASCII
+download method, or use another shell to download the file:
+
+  uuencode zImage zImage > /dev/ttyS1
+
+Of course, use the correct serial port. If the download is successful,
+blob will respond with:
+
+  (Please switch your terminal emulator back to 9600 baud)
+  Received 65536 (0x00010000) bytes.
+
+If an error occurs during downloading, blob will respond with:
+
+  (Please switch your terminal emulator back to 9600 baud)
+  *** Uudecode receive failed
+
+A failed download session can have several reasons: the file is too
+big, the download speed too high (see the "speed" command), or the
+uuencoded file to be downloaded is corrupt. Correct the error and
+retry.
+
+A downloaded kernel or ramdisk can be written to flash with the
+"flash" command, or it can directly be used to boot with the "boot"
+command.
+
+
+
+
+*** "flash"
+-----------
+
+Write the kernel or ramdisk from RAM to flash memory. This command
+needs an extra parameter: "kernel" or "ramdisk". Blob will respond
+with:
+
+  blob> flash kernel
+  Saving kernel to flash ..... .................... done
+
+Currently this command only works when blob is started from the
+external flash board.
+
+
+
+
+*** "reload"
+------------
+
+Reload the kernel or ramdisk from flash memory to RAM. This command
+needs an extra parameter: "kernel" or "ramdisk". Blob will respond
+with:
+
+  blob> reload kernel
+  Loading kernel from flash ....... done
+
+The "reload command" will overwrite a just downloaded a kernel or ramdisk.
+
+
+
+
+*** "reset"
+-----------
+
+Reset the terminal. This command will write the VT100 reset sequence
+(Esc-c) to the terminal. Useful if you forgot to switch your terminal
+emulator back to 9600 baud after downloading a kernel or ramdisk.
+
+
+
+
+*** "speed"
+-----------
+
+Set the download speed. This command needs a download speed value as
+an extra parameter. Valid values are: 1200, 9600, 19200, 38400, 57600,
+and 115200. Blob will respond with:
+
+  blob> speed 19200
+  Download speed set to 19200 baud
+
+
+
+
+*** "status"
+------------
+
+Show the current status. Blob will respond with:
+
+  blob> status
+  Bootloader    : blob
+  Version       : 1.0.0
+  Running from  : internal flash
+  Blocksize     : 0x00800000
+  Download speed: 115200 baud
+  Kernel        : downloaded, 424333 bytes
+  Ramdisk       : from flash
+
+Depending on what commands you used before, these values may or may
+not be different.
